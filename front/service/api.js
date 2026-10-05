@@ -1,185 +1,248 @@
+const BASE_URL = 'http://localhost:3000/api';
 
-// URL da API
-const BASE_URL = 'http://localhost:3000/api/';
 
-// ===============================
-// FUNÇÃO BASE - GET
-// ===============================
-async function getData(endpoint) {
+// ==========================================
+// FUNÇÃO BASE
+// ==========================================
+
+async function request(endpoint, options = {}) {
     try {
-        const response = await fetch(`${BASE_URL}${endpoint}`);
+
+        const response = await fetch(
+            `${BASE_URL}/${endpoint}`,
+            {
+                ...options,
+
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(options.headers || {})
+                }
+            }
+        );
+
 
         if (!response.ok) {
-            throw new Error(`Erro ${response.status}: ${response.statusText}`);
+
+            const mensagem =
+                await response.text();
+
+            throw new Error(
+                `Erro ${response.status}: ${mensagem}`
+            );
         }
+
+
+        // DELETE pode não retornar JSON
+        if (response.status === 204) {
+            return true;
+        }
+
 
         return await response.json();
 
     } catch (error) {
-        console.error(error);
-        alert(`Tivemos problemas ao carregar os dados.\nERRO: ${error.message}`);
-        return [];
-    }
-}
 
+        console.error(
+            'Erro na API:',
+            error
+        );
 
-// ===============================
-// FUNÇÃO BASE - POST
-// ===============================
-async function postData(endpoint, dados) {
-    try {
-        const response = await fetch(`${BASE_URL}${endpoint}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(dados)
-        });
+        alert(
+            `Erro ao comunicar com a API:\n${error.message}`
+        );
 
-        if (!response.ok) {
-            throw new Error(`Erro ${response.status}: ${response.statusText}`);
-        }
-
-        return await response.json();
-
-    } catch (error) {
-        console.error(error);
-        alert(`Tivemos problemas ao salvar os dados.\nERRO: ${error.message}`);
         return null;
     }
 }
 
 
-// ===============================
-// FUNÇÃO BASE - PUT
-// ===============================
-async function putData(endpoint, dados) {
-    try {
-        const response = await fetch(`${BASE_URL}${endpoint}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(dados)
-        });
+// ==========================================
+// GET
+// ==========================================
 
-        if (!response.ok) {
-            throw new Error(`Erro ${response.status}: ${response.statusText}`);
-        }
-
-        return await response.json();
-
-    } catch (error) {
-        console.error(error);
-        alert(`Tivemos problemas ao atualizar os dados.\nERRO: ${error.message}`);
-        return null;
-    }
-}
-
-
-// ===============================
-// FUNÇÃO BASE - DELETE
-// ===============================
-async function deleteData(endpoint) {
-    try {
-        const response = await fetch(`${BASE_URL}${endpoint}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) {
-            throw new Error(`Erro ${response.status}: ${response.statusText}`);
-        }
-
-        return await response.json();
-
-    } catch (error) {
-        console.error(error);
-        alert(`Tivemos problemas ao excluir os dados.\nERRO: ${error.message}`);
-        return null;
-    }
-}
-
-
-// ===============================
-// JOGOS
-// ===============================
-
+// Jogos
 async function getJogos() {
-    return getData('jogos');
-}
-
-async function postJogo(dados) {
-    return postData('jogos', dados);
-}
-
-async function putJogo(id, dados) {
-    return putData(`jogos/${id}`, dados);
-}
-
-async function deleteJogo(id) {
-    return deleteData(`jogos/${id}`);
+    return request('jogos');
 }
 
 
-// ===============================
-// TIMES
-// ===============================
-
+// Times
 async function getTimes() {
-    return getData('times');
-}
-
-async function postTime(dados) {
-    return postData('times', dados);
-}
-
-async function putTime(id, dados) {
-    return putData(`times/${id}`, dados);
-}
-
-async function deleteTime(id) {
-    return deleteData(`times/${id}`);
+    return request('times');
 }
 
 
-// ===============================
-// COMPETIDORES
-// ===============================
-
+// Competidores
 async function getCompetidores() {
-    return getData('competidores');
-}
-
-async function postCompetidor(dados) {
-    return postData('competidores', dados);
-}
-
-async function putCompetidor(id, dados) {
-    return putData(`competidores/${id}`, dados);
-}
-
-async function deleteCompetidor(id) {
-    return deleteData(`competidores/${id}`);
+    return request('competidores');
 }
 
 
-// ===============================
-// CONFRONTOS
-// ===============================
-
+// Confrontos
 async function getConfrontos() {
-    return getData('confrontos');
+    return request('confrontos');
 }
 
+
+// ==========================================
+// POST
+// ==========================================
+
+// Criar jogo
+async function postJogo(dados) {
+
+    return request('jogos', {
+
+        method: 'POST',
+
+        body: JSON.stringify(dados)
+
+    });
+}
+
+
+// Criar time
+async function postTime(dados) {
+
+    return request('times', {
+
+        method: 'POST',
+
+        body: JSON.stringify(dados)
+
+    });
+}
+
+
+// Criar competidor
+async function postCompetidor(dados) {
+
+    return request('competidores', {
+
+        method: 'POST',
+
+        body: JSON.stringify(dados)
+
+    });
+}
+
+
+// Criar confronto
 async function postConfronto(dados) {
-    return postData('confrontos', dados);
+
+    return request('confrontos', {
+
+        method: 'POST',
+
+        body: JSON.stringify(dados)
+
+    });
 }
 
+
+// ==========================================
+// PUT
+// ==========================================
+
+// Atualizar jogo
+async function putJogo(id, dados) {
+
+    return request(
+        `jogos/${id}`,
+        {
+            method: 'PUT',
+            body: JSON.stringify(dados)
+        }
+    );
+}
+
+
+// Atualizar time
+async function putTime(id, dados) {
+
+    return request(
+        `times/${id}`,
+        {
+            method: 'PUT',
+            body: JSON.stringify(dados)
+        }
+    );
+}
+
+
+// Atualizar competidor
+async function putCompetidor(id, dados) {
+
+    return request(
+        `competidores/${id}`,
+        {
+            method: 'PUT',
+            body: JSON.stringify(dados)
+        }
+    );
+}
+
+
+// Atualizar confronto
 async function putConfronto(id, dados) {
-    return putData(`confrontos/${id}`, dados);
+
+    return request(
+        `confrontos/${id}`,
+        {
+            method: 'PUT',
+            body: JSON.stringify(dados)
+        }
+    );
 }
 
+
+// ==========================================
+// DELETE
+// ==========================================
+
+// Excluir jogo
+async function deleteJogo(id) {
+
+    return request(
+        `jogos/${id}`,
+        {
+            method: 'DELETE'
+        }
+    );
+}
+
+
+// Excluir time
+async function deleteTime(id) {
+
+    return request(
+        `times/${id}`,
+        {
+            method: 'DELETE'
+        }
+    );
+}
+
+
+// Excluir competidor
+async function deleteCompetidor(id) {
+
+    return request(
+        `competidores/${id}`,
+        {
+            method: 'DELETE'
+        }
+    );
+}
+
+
+// Excluir confronto
 async function deleteConfronto(id) {
-    return deleteData(`confrontos/${id}`);
-}
 
+    return request(
+        `confrontos/${id}`,
+        {
+            method: 'DELETE'
+        }
+    );
+}

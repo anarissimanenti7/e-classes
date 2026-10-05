@@ -1,9 +1,12 @@
+// ==========================================
+// CONTROLLER - GamerClass
+// ==========================================
 
-let state = {
+const state = {
     jogos: [],
     times: [],
     competidores: [],
-    confrontos: [],
+    confrontos: []
 };
 
 
@@ -13,7 +16,6 @@ let state = {
 
 document.addEventListener('DOMContentLoaded', async () => {
     await carregarDados();
-
     configurarNavegacao();
     renderizarTudo();
 });
@@ -24,17 +26,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ==========================================
 
 async function carregarDados() {
-    const [jogos, times, competidores, confrontos] = await Promise.all([
-        getJogos(),
-        getTimes(),
-        getCompetidores(),
-        getConfrontos(),
-    ]);
+    try {
+        const [jogos, times, competidores, confrontos] = await Promise.all([
+            getJogos(),
+            getTimes(),
+            getCompetidores(),
+            getConfrontos()
+        ]);
 
-    state.jogos = jogos || [];
-    state.times = times || [];
-    state.competidores = competidores || [];
-    state.confrontos = confrontos || [];
+        state.jogos = jogos || [];
+        state.times = times || [];
+        state.competidores = competidores || [];
+        state.confrontos = confrontos || [];
+
+        console.log('JOGOS:', state.jogos);
+        console.log('TIMES:', state.times);
+        console.log('COMPETIDORES:', state.competidores);
+        console.log('CONFRONTOS:', state.confrontos);
+
+    } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+        alert('Não foi possível carregar os dados.');
+    }
 }
 
 
@@ -43,20 +56,23 @@ async function carregarDados() {
 // ==========================================
 
 function configurarNavegacao() {
-    const links = document.querySelectorAll('[data-section]');
+    const itens = document.querySelectorAll('#sidebar-nav li');
 
-    links.forEach(link => {
-        link.addEventListener('click', () => {
-            const section = link.dataset.section;
+    itens.forEach(item => {
+        item.addEventListener('click', () => {
+            const view = item.dataset.view;
 
-            document.querySelectorAll('.section').forEach(sec => {
-                sec.classList.remove('active');
+            itens.forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+
+            document.querySelectorAll('.view').forEach(secao => {
+                secao.classList.remove('active');
             });
 
-            const alvo = document.getElementById(section);
+            const secaoSelecionada = document.getElementById(`view-${view}`);
 
-            if (alvo) {
-                alvo.classList.add('active');
+            if (secaoSelecionada) {
+                secaoSelecionada.classList.add('active');
             }
         });
     });
@@ -81,26 +97,86 @@ function renderizarTudo() {
 // ==========================================
 
 function renderizarDashboard() {
-    const totalJogos = document.getElementById('total-jogos');
-    const totalTimes = document.getElementById('total-times');
-    const totalCompetidores = document.getElementById('total-competidores');
-    const totalConfrontos = document.getElementById('total-confrontos');
+    const stats = document.getElementById('dashboard-stats');
+    const upcoming = document.getElementById('upcoming-matches');
 
-    if (totalJogos) {
-        totalJogos.textContent = state.jogos.length;
+    if (!stats || !upcoming) return;
+
+    stats.innerHTML = `
+        <div class="stat-card">
+            <i class="fas fa-trophy"></i>
+            <div>
+                <span>Jogos</span>
+                <strong>${state.jogos.length}</strong>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <i class="fas fa-users"></i>
+            <div>
+                <span>Times</span>
+                <strong>${state.times.length}</strong>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <i class="fas fa-user-ninja"></i>
+            <div>
+                <span>Competidores</span>
+                <strong>${state.competidores.length}</strong>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <i class="fas fa-hand-fist"></i>
+            <div>
+                <span>Confrontos</span>
+                <strong>${state.confrontos.length}</strong>
+            </div>
+        </div>
+    `;
+
+    const confrontosAgendados = state.confrontos.filter(
+        confronto => confronto.status !== 'finished'
+    );
+
+    if (confrontosAgendados.length === 0) {
+        upcoming.innerHTML = `
+            <div class="empty-state">
+                <p>Nenhum confronto agendado.</p>
+            </div>
+        `;
+        return;
     }
 
-    if (totalTimes) {
-        totalTimes.textContent = state.times.length;
-    }
+    upcoming.innerHTML = confrontosAgendados.map(confronto => {
+        const jogo = state.jogos.find(j => j.id == confronto.gameId);
 
-    if (totalCompetidores) {
-        totalCompetidores.textContent = state.competidores.length;
-    }
+        const time1 = state.times.find(t => t.id == confronto.team1Id);
+        const time2 = state.times.find(t => t.id == confronto.team2Id);
 
-    if (totalConfrontos) {
-        totalConfrontos.textContent = state.confrontos.length;
-    }
+        return `
+            <div class="match-card">
+
+                <div class="match-game">
+                    ${jogo ? jogo.name : 'Jogo'}
+                </div>
+
+                <div class="match-teams">
+                    <strong>${time1 ? time1.name : 'Time 1'}</strong>
+
+                    <span>VS</span>
+
+                    <strong>${time2 ? time2.name : 'Time 2'}</strong>
+                </div>
+
+                <div class="match-date">
+                    ${formatarData(confronto.date)}
+                </div>
+
+            </div>
+        `;
+    }).join('');
 }
 
 
@@ -109,19 +185,45 @@ function renderizarDashboard() {
 // ==========================================
 
 function renderizarJogos() {
-    const container = document.getElementById('lista-jogos');
+    const container = document.getElementById('list-jogos');
 
     if (!container) return;
 
     if (state.jogos.length === 0) {
-        container.innerHTML = '<p>Nenhum jogo cadastrado.</p>';
+        container.innerHTML = `
+            <div class="empty-state">
+                <p>Nenhum jogo cadastrado.</p>
+            </div>
+        `;
         return;
     }
 
     container.innerHTML = state.jogos.map(jogo => `
         <div class="card">
-            <h3>${jogo.name}</h3>
-            <p>${jogo.genre}</p>
+
+            <div class="card-header">
+                <h3>${escaparHTML(jogo.name)}</h3>
+                <span class="badge">
+                    ${escaparHTML(jogo.genre || 'Sem gênero')}
+                </span>
+            </div>
+
+            <p>ID: ${jogo.id}</p>
+
+            <div class="card-actions">
+                <button
+                    class="btn-secondary"
+                    onclick="editarItem('jogo', ${jogo.id})">
+                    <i class="fas fa-pen"></i> Editar
+                </button>
+
+                <button
+                    class="btn-danger"
+                    onclick="excluirItem('jogo', ${jogo.id})">
+                    <i class="fas fa-trash"></i> Excluir
+                </button>
+            </div>
+
         </div>
     `).join('');
 }
@@ -132,32 +234,71 @@ function renderizarJogos() {
 // ==========================================
 
 function renderizarTimes() {
-    const container = document.getElementById('lista-times');
+    const container = document.getElementById('list-times');
 
     if (!container) return;
 
     if (state.times.length === 0) {
-        container.innerHTML = '<p>Nenhum time cadastrado.</p>';
+        container.innerHTML = `
+            <div class="empty-state">
+                <p>Nenhum time cadastrado.</p>
+            </div>
+        `;
         return;
     }
 
-    container.innerHTML = state.times.map(time => `
-        <div class="card">
-            <h3>${time.name}</h3>
+    container.innerHTML = state.times.map(time => {
 
-            <div
-                style="
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 50%;
-                    background: ${time.color};
-                    display: inline-block;
-                "
-            ></div>
+        const quantidadeCompetidores = state.competidores.filter(
+            competidor => competidor.teamId == time.id
+        ).length;
 
-            <p>${time.color}</p>
-        </div>
-    `).join('');
+        return `
+            <div class="card">
+
+                <div class="card-header">
+
+                    <div style="
+                        width: 15px;
+                        height: 15px;
+                        border-radius: 50%;
+                        background: ${time.color || '#999'};
+                        display: inline-block;
+                        margin-right: 8px;
+                    "></div>
+
+                    <h3>${escaparHTML(time.name)}</h3>
+
+                </div>
+
+                <p>
+                    ${quantidadeCompetidores}
+                    competidor(es)
+                </p>
+
+                <p>
+                    Cor: ${escaparHTML(time.color || 'Não definida')}
+                </p>
+
+                <div class="card-actions">
+
+                    <button
+                        class="btn-secondary"
+                        onclick="editarItem('time', ${time.id})">
+                        <i class="fas fa-pen"></i> Editar
+                    </button>
+
+                    <button
+                        class="btn-danger"
+                        onclick="excluirItem('time', ${time.id})">
+                        <i class="fas fa-trash"></i> Excluir
+                    </button>
+
+                </div>
+
+            </div>
+        `;
+    }).join('');
 }
 
 
@@ -166,33 +307,60 @@ function renderizarTimes() {
 // ==========================================
 
 function renderizarCompetidores() {
-    const container = document.getElementById('lista-competidores');
+    const container = document.getElementById('list-competidores');
 
     if (!container) return;
 
     if (state.competidores.length === 0) {
-        container.innerHTML = '<p>Nenhum competidor cadastrado.</p>';
+        container.innerHTML = `
+            <div class="empty-state">
+                <p>Nenhum competidor cadastrado.</p>
+            </div>
+        `;
         return;
     }
 
     container.innerHTML = state.competidores.map(competidor => {
+
         const time = state.times.find(
             t => t.id == competidor.teamId
         );
 
         return `
             <div class="card">
-                <h3>${competidor.name}</h3>
+
+                <div class="card-header">
+                    <h3>${escaparHTML(competidor.name)}</h3>
+                </div>
 
                 <p>
-                    Nickname:
-                    <strong>${competidor.nickname}</strong>
+                    <strong>Nickname:</strong>
+                    ${escaparHTML(competidor.nickname || 'Não informado')}
                 </p>
 
                 <p>
-                    Time:
-                    ${time ? time.name : 'Sem time'}
+                    <strong>Time:</strong>
+                    ${time
+                ? escaparHTML(time.name)
+                : 'Sem time'}
                 </p>
+
+                <div class="card-actions">
+
+                    <button
+                        class="btn-secondary"
+                        onclick="editarItem('competidor', ${competidor.id})">
+                        <i class="fas fa-pen"></i> Editar
+                    </button>
+
+                    <button
+                        class="btn-danger"
+                        onclick="excluirItem('competidor', ${competidor.id})">
+                        <i class="fas fa-trash"></i> Excluir
+                    </button>
+
+                </div>
+
             </div>
         `;
     }).join('');
@@ -204,16 +372,21 @@ function renderizarCompetidores() {
 // ==========================================
 
 function renderizarConfrontos() {
-    const container = document.getElementById('lista-confrontos');
+    const container = document.getElementById('list-confrontos');
 
     if (!container) return;
 
     if (state.confrontos.length === 0) {
-        container.innerHTML = '<p>Nenhum confronto cadastrado.</p>';
+        container.innerHTML = `
+            <div class="empty-state">
+                <p>Nenhum confronto cadastrado.</p>
+            </div>
+        `;
         return;
     }
 
     container.innerHTML = state.confrontos.map(confronto => {
+
         const jogo = state.jogos.find(
             j => j.id == confronto.gameId
         );
@@ -226,42 +399,77 @@ function renderizarConfrontos() {
             t => t.id == confronto.team2Id
         );
 
+        const finalizado = confronto.status === 'finished';
+
         return `
             <div class="card">
-                <h3>
-                    ${time1 ? time1.name : 'Time 1'}
-                    ${confronto.score1}
+
+                <div class="card-header">
+                    <h3>
+                        ${time1
+                ? escaparHTML(time1.name)
+                : 'Time 1'}
+
+                        <span> VS </span>
+
+                        ${time2
+                ? escaparHTML(time2.name)
+                : 'Time 2'}
+                    </h3>
+                </div>
+
+                <p>
+                    <strong>Jogo:</strong>
+                    ${jogo
+                ? escaparHTML(jogo.name)
+                : 'Não informado'}
+                </p>
+
+                <p>
+                    <strong>Placar:</strong>
+                    ${confronto.score1 ?? 0}
                     x
-                    ${confronto.score2}
-                    ${time2 ? time2.name : 'Time 2'}
-                </h3>
-
-                <p>
-                    Jogo:
-                    ${jogo ? jogo.name : 'Não informado'}
+                    ${confronto.score2 ?? 0}
                 </p>
 
                 <p>
-                    Data:
-                    ${confronto.date || 'Não informada'}
+                    <strong>Status:</strong>
+                    ${finalizado ? 'Finalizado' : 'Agendado'}
                 </p>
 
                 <p>
-                    Status:
-                    <strong>${confronto.status}</strong>
+                    <strong>Data:</strong>
+                    ${formatarData(confronto.date)}
                 </p>
 
-                ${
-                    confronto.status === 'scheduled'
-                        ? `
+                <div class="card-actions">
+
+                    ${!finalizado
+                ? `
                             <button
-                                onclick="encerrarConfrontos(${confronto.id})"
-                            >
-                                Finalizar
+                                class="btn-primary"
+                                onclick="encerrarConfronto(${confronto.id})">
+                                <i class="fas fa-flag-checkered"></i>
+                                Encerrar
                             </button>
                         `
-                        : ''
-                }
+                : ''
+            }
+
+                    <button
+                        class="btn-secondary"
+                        onclick="editarItem('confronto', ${confronto.id})">
+                        <i class="fas fa-pen"></i> Editar
+                    </button>
+
+                    <button
+                        class="btn-danger"
+                        onclick="excluirItem('confronto', ${confronto.id})">
+                        <i class="fas fa-trash"></i> Excluir
+                    </button>
+
+                </div>
+
             </div>
         `;
     }).join('');
@@ -269,202 +477,323 @@ function renderizarConfrontos() {
 
 
 // ==========================================
-// MODAL
+// ABRIR FORMULÁRIO
 // ==========================================
 
-window.abrirFormulario = function(tipo) {
-    const modal = document.getElementById('modal');
+window.abrirFormulario = function (tipo, id = null) {
 
-    if (!modal) return;
+    const modal = document.getElementById('modal-container');
+    const formContent = document.getElementById('form-content');
 
-    const conteudo = modal.querySelector('.modal-content');
+    if (!modal || !formContent) return;
 
-    let titulo = '';
-    let formulario = '';
+    const editando = id !== null;
+
+    let registro = null;
+
+    if (editando) {
+
+        if (tipo === 'jogo') {
+            registro = state.jogos.find(j => j.id == id);
+        }
+
+        if (tipo === 'time') {
+            registro = state.times.find(t => t.id == id);
+        }
+
+        if (tipo === 'competidor') {
+            registro = state.competidores.find(c => c.id == id);
+        }
+
+        if (tipo === 'confronto') {
+            registro = state.confrontos.find(c => c.id == id);
+        }
+    }
+
+
+    // ======================================
+    // FORMULÁRIO DE JOGO
+    // ======================================
 
     if (tipo === 'jogo') {
-        titulo = 'Cadastrar Jogo';
 
-        formulario = `
-            <h2>${titulo}</h2>
+        formContent.innerHTML = `
+            <h2>${editando ? 'Editar Jogo' : 'Novo Jogo'}</h2>
 
-            <form onsubmit="salvarItem(event, 'jogos')">
+            <form onsubmit="salvarItem(event, 'jogo', ${editando ? id : 'null'})">
 
-                <label>Nome</label>
+                <label>Nome do jogo</label>
+
                 <input
                     type="text"
-                    name="name"
+                    id="nome"
                     required
+                    value="${registro ? escaparAtributo(registro.name) : ''}"
                 >
 
                 <label>Gênero</label>
+
                 <input
                     type="text"
-                    name="genre"
+                    id="genre"
                     required
+                    value="${registro ? escaparAtributo(registro.genre) : ''}"
                 >
 
-                <button type="submit">
-                    Salvar
-                </button>
+                <div class="form-actions">
 
-                <button
-                    type="button"
-                    onclick="fecharModal()"
-                >
-                    Cancelar
-                </button>
+                    <button
+                        type="button"
+                        class="btn-secondary"
+                        onclick="fecharModal()">
+                        Cancelar
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="btn-primary">
+                        ${editando ? 'Salvar alterações' : 'Cadastrar'}
+                    </button>
+
+                </div>
 
             </form>
         `;
     }
 
+
+    // ======================================
+    // FORMULÁRIO DE TIME
+    // ======================================
+
     if (tipo === 'time') {
-        titulo = 'Cadastrar Time';
 
-        formulario = `
-            <h2>${titulo}</h2>
+        formContent.innerHTML = `
+            <h2>${editando ? 'Editar Time' : 'Novo Time'}</h2>
 
-            <form onsubmit="salvarItem(event, 'times')">
+            <form onsubmit="salvarItem(event, 'time', ${editando ? id : 'null'})">
 
-                <label>Nome</label>
+                <label>Nome do time</label>
+
                 <input
                     type="text"
-                    name="name"
+                    id="nome"
                     required
+                    value="${registro ? escaparAtributo(registro.name) : ''}"
                 >
 
                 <label>Cor</label>
+
                 <input
                     type="color"
-                    name="color"
-                    value="#7B1FA2"
-                    required
+                    id="color"
+                    value="${registro ? escaparAtributo(registro.color || '#7B1FA2') : '#7B1FA2'}"
                 >
 
-                <button type="submit">
-                    Salvar
-                </button>
+                <div class="form-actions">
 
-                <button
-                    type="button"
-                    onclick="fecharModal()"
-                >
-                    Cancelar
-                </button>
+                    <button
+                        type="button"
+                        class="btn-secondary"
+                        onclick="fecharModal()">
+                        Cancelar
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="btn-primary">
+                        ${editando ? 'Salvar alterações' : 'Cadastrar'}
+                    </button>
+
+                </div>
 
             </form>
         `;
     }
 
+
+    // ======================================
+    // FORMULÁRIO DE COMPETIDOR
+    // ======================================
+
     if (tipo === 'competidor') {
-        titulo = 'Cadastrar Competidor';
 
-        formulario = `
-            <h2>${titulo}</h2>
+        const optionsTimes = state.times.map(time => `
+            <option
+                value="${time.id}"
+                ${registro && registro.teamId == time.id ? 'selected' : ''}>
+                ${escaparHTML(time.name)}
+            </option>
+        `).join('');
 
-            <form onsubmit="salvarItem(event, 'competidores')">
+        formContent.innerHTML = `
+            <h2>${editando ? 'Editar Competidor' : 'Novo Competidor'}</h2>
+
+            <form onsubmit="salvarItem(event, 'competidor', ${editando ? id : 'null'})">
 
                 <label>Nome</label>
+
                 <input
                     type="text"
-                    name="name"
+                    id="nome"
                     required
+                    value="${registro ? escaparAtributo(registro.name) : ''}"
                 >
 
                 <label>Nickname</label>
+
                 <input
                     type="text"
-                    name="nickname"
+                    id="nickname"
                     required
+                    value="${registro ? escaparAtributo(registro.nickname) : ''}"
                 >
 
                 <label>Time</label>
 
-                <select name="teamId" required>
+                <select id="teamId" required>
 
                     <option value="">
                         Selecione um time
                     </option>
 
-                    ${state.times.map(time => `
-                        <option value="${time.id}">
-                            ${time.name}
-                        </option>
-                    `).join('')}
+                    ${optionsTimes}
 
                 </select>
 
-                <button type="submit">
-                    Salvar
-                </button>
+                <div class="form-actions">
 
-                <button
-                    type="button"
-                    onclick="fecharModal()"
-                >
-                    Cancelar
-                </button>
+                    <button
+                        type="button"
+                        class="btn-secondary"
+                        onclick="fecharModal()">
+                        Cancelar
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="btn-primary">
+                        ${editando ? 'Salvar alterações' : 'Cadastrar'}
+                    </button>
+
+                </div>
 
             </form>
         `;
     }
 
+
+    // ======================================
+    // FORMULÁRIO DE CONFRONTO
+    // ======================================
+
     if (tipo === 'confronto') {
-        titulo = 'Cadastrar Confronto';
 
-        formulario = `
-            <h2>${titulo}</h2>
+        const optionsJogos = state.jogos.map(jogo => `
+            <option
+                value="${jogo.id}"
+                ${registro && registro.gameId == jogo.id ? 'selected' : ''}>
+                ${escaparHTML(jogo.name)}
+            </option>
+        `).join('');
 
-            <form onsubmit="salvarItem(event, 'confrontos')">
+        const optionsTimes1 = state.times.map(time => `
+            <option
+                value="${time.id}"
+                ${registro && registro.team1Id == time.id ? 'selected' : ''}>
+                ${escaparHTML(time.name)}
+            </option>
+        `).join('');
+
+        const optionsTimes2 = state.times.map(time => `
+            <option
+                value="${time.id}"
+                ${registro && registro.team2Id == time.id ? 'selected' : ''}>
+                ${escaparHTML(time.name)}
+            </option>
+        `).join('');
+
+        formContent.innerHTML = `
+            <h2>${editando ? 'Editar Confronto' : 'Registrar Confronto'}</h2>
+
+            <form onsubmit="salvarItem(event, 'confronto', ${editando ? id : 'null'})">
 
                 <label>Jogo</label>
 
-                <select name="gameId" required>
+                <select id="gameId" required>
 
                     <option value="">
                         Selecione um jogo
                     </option>
 
-                    ${state.jogos.map(jogo => `
-                        <option value="${jogo.id}">
-                            ${jogo.name}
-                        </option>
-                    `).join('')}
+                    ${optionsJogos}
 
                 </select>
 
 
                 <label>Time 1</label>
 
-                <select name="team1Id" required>
+                <select id="team1Id" required>
 
                     <option value="">
                         Selecione o primeiro time
                     </option>
 
-                    ${state.times.map(time => `
-                        <option value="${time.id}">
-                            ${time.name}
-                        </option>
-                    `).join('')}
+                    ${optionsTimes1}
 
                 </select>
 
 
                 <label>Time 2</label>
 
-                <select name="team2Id" required>
+                <select id="team2Id" required>
 
                     <option value="">
                         Selecione o segundo time
                     </option>
 
-                    ${state.times.map(time => `
-                        <option value="${time.id}">
-                            ${time.name}
-                        </option>
-                    `).join('')}
+                    ${optionsTimes2}
+
+                </select>
+
+
+                <label>Placar Time 1</label>
+
+                <input
+                    type="number"
+                    id="score1"
+                    min="0"
+                    value="${registro ? registro.score1 ?? 0 : 0}"
+                    required
+                >
+
+
+                <label>Placar Time 2</label>
+
+                <input
+                    type="number"
+                    id="score2"
+                    min="0"
+                    value="${registro ? registro.score2 ?? 0 : 0}"
+                    required
+                >
+
+
+                <label>Status</label>
+
+                <select id="status">
+
+                    <option
+                        value="scheduled"
+                        ${registro?.status === 'scheduled' || !registro ? 'selected' : ''}>
+                        Agendado
+                    </option>
+
+                    <option
+                        value="finished"
+                        ${registro?.status === 'finished' ? 'selected' : ''}>
+                        Finalizado
+                    </option>
 
                 </select>
 
@@ -473,48 +802,36 @@ window.abrirFormulario = function(tipo) {
 
                 <input
                     type="datetime-local"
-                    name="date"
+                    id="date"
                     required
+                    value="${registro ? escaparAtributo(registro.date) : ''}"
                 >
 
 
-                <input
-                    type="hidden"
-                    name="score1"
-                    value="0"
-                >
+                <div class="form-actions">
 
-                <input
-                    type="hidden"
-                    name="score2"
-                    value="0"
-                >
+                    <button
+                        type="button"
+                        class="btn-secondary"
+                        onclick="fecharModal()">
+                        Cancelar
+                    </button>
 
-                <input
-                    type="hidden"
-                    name="status"
-                    value="scheduled"
-                >
+                    <button
+                        type="submit"
+                        class="btn-primary">
+                        ${editando ? 'Salvar alterações' : 'Cadastrar'}
+                    </button>
 
-
-                <button type="submit">
-                    Salvar
-                </button>
-
-                <button
-                    type="button"
-                    onclick="fecharModal()"
-                >
-                    Cancelar
-                </button>
+                </div>
 
             </form>
         `;
     }
 
-    conteudo.innerHTML = formulario;
 
-    modal.style.display = 'flex';
+    modal.style.opacity = '1';
+    modal.style.pointerEvents = 'auto';
 };
 
 
@@ -522,283 +839,327 @@ window.abrirFormulario = function(tipo) {
 // FECHAR MODAL
 // ==========================================
 
-window.fecharModal = function() {
-    const modal = document.getElementById('modal');
+window.fecharModal = function () {
 
-    if (modal) {
-        modal.style.display = 'none';
-    }
+    const modal = document.getElementById('modal-container');
+
+    if (!modal) return;
+
+    modal.style.opacity = '0';
+    modal.style.pointerEvents = 'none';
 };
 
 
 // ==========================================
-// SALVAR ITEM - POST
+// SALVAR ITEM
+// POST OU PUT
 // ==========================================
-window.salvarItem = async function (event, colecao) {
+
+window.salvarItem = async function (event, tipo, id = null) {
+
     event.preventDefault();
 
-    const dados = Object.fromEntries(
-        new FormData(event.target).entries()
+    let dados = null;
+
+    // ======================================
+    // JOGO
+    // ======================================
+
+    if (tipo === 'jogo') {
+
+        dados = {
+            name: document.getElementById('nome').value.trim(),
+            genre: document.getElementById('genre').value.trim()
+        };
+
+        if (!dados.name || !dados.genre) {
+            alert('Preencha todos os campos.');
+            return;
+        }
+
+        if (id === null) {
+            await postJogo(dados);
+        } else {
+            await putJogo(id, dados);
+        }
+    }
+
+
+    // ======================================
+    // TIME
+    // ======================================
+
+    if (tipo === 'time') {
+
+        dados = {
+            name: document.getElementById('nome').value.trim(),
+            color: document.getElementById('color').value
+        };
+
+        if (!dados.name) {
+            alert('Digite o nome do time.');
+            return;
+        }
+
+        if (id === null) {
+            await postTime(dados);
+        } else {
+            await putTime(id, dados);
+        }
+    }
+
+
+    // ======================================
+    // COMPETIDOR
+    // ======================================
+
+    if (tipo === 'competidor') {
+
+        dados = {
+            name: document.getElementById('nome').value.trim(),
+            nickname: document.getElementById('nickname').value.trim(),
+            teamId: Number(document.getElementById('teamId').value)
+        };
+
+        if (!dados.name || !dados.nickname || !dados.teamId) {
+            alert('Preencha todos os campos.');
+            return;
+        }
+
+        if (id === null) {
+            await postCompetidor(dados);
+        } else {
+            await putCompetidor(id, dados);
+        }
+    }
+
+
+    // ======================================
+    // CONFRONTO
+    // ======================================
+
+    if (tipo === 'confronto') {
+
+        dados = {
+            gameId: Number(document.getElementById('gameId').value),
+            team1Id: Number(document.getElementById('team1Id').value),
+            team2Id: Number(document.getElementById('team2Id').value),
+            score1: Number(document.getElementById('score1').value),
+            score2: Number(document.getElementById('score2').value),
+            status: document.getElementById('status').value,
+            date: document.getElementById('date').value
+        };
+
+        if (
+            !dados.gameId ||
+            !dados.team1Id ||
+            !dados.team2Id ||
+            !dados.date
+        ) {
+            alert('Preencha todos os campos.');
+            return;
+        }
+
+        if (dados.team1Id === dados.team2Id) {
+            alert('Os dois times precisam ser diferentes.');
+            return;
+        }
+
+        if (id === null) {
+            await postConfronto(dados);
+        } else {
+            await putConfronto(id, dados);
+        }
+    }
+
+
+    // ======================================
+    // RECARREGAR DADOS
+    // ======================================
+
+    await carregarDados();
+
+    renderizarTudo();
+
+    fecharModal();
+
+    alert(
+        id === null
+            ? 'Cadastro realizado com sucesso!'
+            : 'Alteração realizada com sucesso!'
+    );
+};
+
+
+// ==========================================
+// EDITAR ITEM
+// ==========================================
+
+window.editarItem = function (tipo, id) {
+
+    abrirFormulario(tipo, id);
+};
+
+
+// ==========================================
+// EXCLUIR ITEM
+// ==========================================
+
+window.excluirItem = async function (tipo, id) {
+
+    const confirmar = confirm(
+        'Tem certeza que deseja excluir este registro?'
     );
 
-    // Converte os IDs para número
-    if (dados.teamId) {
-        dados.teamId = Number(dados.teamId);
+    if (!confirmar) return;
+
+    let sucesso = false;
+
+
+    if (tipo === 'jogo') {
+        sucesso = await deleteJogo(id);
     }
 
-    if (dados.gameId) {
-        dados.gameId = Number(dados.gameId);
+    if (tipo === 'time') {
+        sucesso = await deleteTime(id);
     }
 
-    if (dados.team1Id) {
-        dados.team1Id = Number(dados.team1Id);
+    if (tipo === 'competidor') {
+        sucesso = await deleteCompetidor(id);
     }
 
-    if (dados.team2Id) {
-        dados.team2Id = Number(dados.team2Id);
+    if (tipo === 'confronto') {
+        sucesso = await deleteConfronto(id);
     }
 
-    if (dados.score1 !== undefined) {
-        dados.score1 = Number(dados.score1);
-    }
 
-    if (dados.score2 !== undefined) {
-        dados.score2 = Number(dados.score2);
-    }
-
-    let resultado = null;
-
-    // POST para a API
-    if (colecao === 'jogos') {
-        resultado = await postJogo(dados);
-    }
-
-    if (colecao === 'times') {
-        resultado = await postTime(dados);
-    }
-
-    if (colecao === 'competidores') {
-        resultado = await postCompetidor(dados);
-    }
-
-    if (colecao === 'confrontos') {
-        resultado = await postConfronto(dados);
-    }
-
-    // Se deu erro na API
-    if (!resultado) {
+    if (!sucesso) {
         return;
     }
 
-    // Fecha o modal
-    fecharModal();
 
-    // Busca novamente os dados do JSON
     await carregarDados();
 
-    // Atualiza a tela
     renderizarTudo();
 
-    alert('Cadastro realizado com sucesso!');
+    alert('Registro excluído com sucesso!');
 };
-    // ===============================
-    // JOGO
-    // ===============================
-
-    if (colecao === 'jogos') {
-        resultado = await postJogo(dados);
-    }
-
-
-    // ===============================
-    // TIME
-    // ===============================
-
-    if (colecao === 'times') {
-        resultado = await postTime(dados);
-    }
-
-
-    // ===============================
-    // COMPETIDOR
-    // ===============================
-
-    if (colecao === 'competidores') {
-        resultado = await postCompetidor(dados);
-    }
-
-
-    // ===============================
-    // CONFRONTO
-    // ===============================
-
-    if (colecao === 'confrontos') {
-        resultado = await postConfronto(dados);
-    }
-
-
-    // Se a API retornou erro
-    if (!resultado) {
-        return;
-    }
-
-
-    // Fecha o modal
-    fecharModal();
-
-
-    // Recarrega os dados do JSON através da API
-    await carregarDados();
-
-
-    // Atualiza a tela
-    renderizarTudo();
-
-
-    alert('Cadastro realizado com sucesso!');
-
 
 
 // ==========================================
-// FINALIZAR CONFRONTO - PUT
+// ENCERRAR CONFRONTO
 // ==========================================
 
-window.encerrarConfrontos = async function (id) {
+window.encerrarConfronto = async function (id) {
+
     const confronto = state.confrontos.find(
         c => c.id == id
     );
 
-    if (!confronto) return;
+    if (!confronto) {
+        alert('Confronto não encontrado.');
+        return;
+    }
 
-    const time1 = state.times.find(
-        t => t.id == confronto.team1Id
+
+    const score1 = prompt(
+        'Digite o placar do Time 1:',
+        confronto.score1 ?? 0
     );
 
-    const time2 = state.times.find(
-        t => t.id == confronto.team2Id
+    if (score1 === null) return;
+
+
+    const score2 = prompt(
+        'Digite o placar do Time 2:',
+        confronto.score2 ?? 0
     );
 
-    const placar1 = prompt(
-        `Placar para ${time1?.name}:`,
-        '0'
-    );
+    if (score2 === null) return;
 
-    if (placar1 === null) return;
 
-    const placar2 = prompt(
-        `Placar para ${time2?.name}:`,
-        '0'
-    );
+    const novoScore1 = Number(score1);
+    const novoScore2 = Number(score2);
 
-    if (placar2 === null) return;
+
+    if (
+        Number.isNaN(novoScore1) ||
+        Number.isNaN(novoScore2) ||
+        novoScore1 < 0 ||
+        novoScore2 < 0
+    ) {
+        alert('Digite placares válidos.');
+        return;
+    }
+
 
     const dadosAtualizados = {
         ...confronto,
-        score1: Number(placar1),
-        score2: Number(placar2),
+        score1: novoScore1,
+        score2: novoScore2,
         status: 'finished'
     };
 
-    // PUT para a API
+
     const resultado = await putConfronto(
         id,
         dadosAtualizados
     );
 
-    if (!resultado) return;
-
-    // Busca novamente o data.json através da API
-    await carregarDados();
-
-    // Atualiza a tela
-    renderizarTudo();
-
-    alert('Confronto finalizado com sucesso!');
-};
-// ==========================================
-// DELETE - JOGOS
-// ==========================================
-
-window.excluirJogo = async function(id) {
-    const confirmar = confirm(
-        'Deseja realmente excluir este jogo?'
-    );
-
-    if (!confirmar) return;
-
-    const resultado = await deleteJogo(id);
 
     if (!resultado) return;
 
+
     await carregarDados();
+
     renderizarTudo();
 
-    alert('Jogo excluído com sucesso!');
+    alert('Confronto encerrado com sucesso!');
 };
 
 
 // ==========================================
-// DELETE - TIMES
+// FORMATAR DATA
 // ==========================================
 
-window.excluirTime = async function(id) {
-    const confirmar = confirm(
-        'Deseja realmente excluir este time?'
-    );
+function formatarData(data) {
 
-    if (!confirmar) return;
+    if (!data) {
+        return 'Data não informada';
+    }
 
-    const resultado = await deleteTime(id);
+    const dataObj = new Date(data);
 
-    if (!resultado) return;
+    if (Number.isNaN(dataObj.getTime())) {
+        return data;
+    }
 
-    await carregarDados();
-    renderizarTudo();
-
-    alert('Time excluído com sucesso!');
-};
-
-
-// ==========================================
-// DELETE - COMPETIDORES
-// ==========================================
-
-window.excluirCompetidor = async function(id) {
-    const confirmar = confirm(
-        'Deseja realmente excluir este competidor?'
-    );
-
-    if (!confirmar) return;
-
-    const resultado = await deleteCompetidor(id);
-
-    if (!resultado) return;
-
-    await carregarDados();
-    renderizarTudo();
-
-    alert('Competidor excluído com sucesso!');
-};
+    return dataObj.toLocaleString('pt-BR', {
+        dateStyle: 'short',
+        timeStyle: 'short'
+    });
+}
 
 
 // ==========================================
-// DELETE - CONFRONTOS
+// PROTEÇÃO CONTRA HTML
 // ==========================================
 
-window.excluirConfronto = async function(id) {
-    const confirmar = confirm(
-        'Deseja realmente excluir este confronto?'
-    );
+function escaparHTML(valor) {
 
-    if (!confirmar) return;
+    if (valor === null || valor === undefined) {
+        return '';
+    }
 
-    const resultado = await deleteConfronto(id);
+    return String(valor)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
-    if (!resultado) return;
 
-    await carregarDados();
-    renderizarTudo();
-
-    alert('Confronto excluído com sucesso!');
-};
-
+function escaparAtributo(valor) {
+    return escaparHTML(valor);
+}
