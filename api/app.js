@@ -1,638 +1,889 @@
+require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = 3000;
 
+// Middlewares
 app.use(cors());
 app.use(express.json());
 
-const caminhoDados = path.join(__dirname, 'data.json');
+// Configuração do Supabase
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// ==========================================
-// FUNÇÕES AUXILIARES
-// ==========================================
-
-// Lê o data.json
-function lerDados() {
-    const conteudo = fs.readFileSync(caminhoDados, 'utf-8');
-    return JSON.parse(conteudo);
-}
-
-// Salva os dados no data.json
-function salvarDados(dados) {
-    fs.writeFileSync(
-        caminhoDados,
-        JSON.stringify(dados, null, 2),
-        'utf-8'
+if (!supabaseUrl || !supabaseKey) {
+    console.error(
+        'ERRO: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não foi configurada no .env'
     );
+    process.exit(1);
 }
 
-// Gera um novo ID
-function gerarId(lista) {
-    if (lista.length === 0) {
-        return 1;
-    }
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-    return Math.max(...lista.map(item => item.id)) + 1;
+// Teste da configuração
+console.log('Supabase URL carregada:', supabaseUrl);
+console.log('Chave do Supabase carregada:', !!supabaseKey);
+
+// =====================================================
+// FUNÇÕES AUXILIARES
+// =====================================================
+
+function mapCompetidor(item) {
+    return {
+        id: item.id,
+        name: item.name,
+        nickname: item.nickname,
+        teamId: item.team_id
+    };
 }
 
-// ==========================================
-// ROTA PRINCIPAL
-// ==========================================
+function mapConfronto(item) {
+    return {
+        id: item.id,
+        gameId: item.game_id,
+        team1Id: item.team1_id,
+        team2Id: item.team2_id,
+        score1: item.score1,
+        score2: item.score2,
+        status: item.status,
+        date: item.date
+    };
+}
+
+// =====================================================
+// ROTA INICIAL
+// =====================================================
 
 app.get('/', (req, res) => {
-    res.status(200).json({
-        mensagem: 'Bem vindo à API GamerClass',
-        status: 'sucesso',
-        rotas: [
-            '/api/jogos',
-            '/api/times',
-            '/api/competidores',
-            '/api/confrontos'
-        ],
-        metodos: ['GET', 'POST', 'PUT', 'DELETE']
+    res.json({
+        mensagem: 'API GamerClass funcionando!',
+        banco: 'Supabase'
     });
 });
 
-// ==========================================
-// JOGOS
-// ==========================================
-
-// GET /api/jogos
-app.get('/api/jogos', (req, res) => {
-    const dados = lerDados();
-
-    res.status(200).json(dados.games);
-});
-
-// GET /api/jogos/:id
-app.get('/api/jogos/:id', (req, res) => {
-    const dados = lerDados();
-
-    const jogo = dados.games.find(
-        jogo => jogo.id === Number(req.params.id)
-    );
-
-    if (!jogo) {
-        return res.status(404).json({
-            erro: 'Jogo não encontrado'
-        });
-    }
-
-    res.status(200).json(jogo);
-});
-
-// POST /api/jogos
-app.post('/api/jogos', (req, res) => {
-    const dados = lerDados();
-
-    const { name, genre } = req.body;
-
-    if (!name || !genre) {
-        return res.status(400).json({
-            erro: 'Nome e gênero são obrigatórios'
-        });
-    }
-
-    const novoJogo = {
-        id: gerarId(dados.games),
-        name,
-        genre
-    };
-
-    dados.games.push(novoJogo);
-
-    salvarDados(dados);
-
-    res.status(201).json(novoJogo);
-});
-
-// PUT /api/jogos/:id
-app.put('/api/jogos/:id', (req, res) => {
-    const dados = lerDados();
-
-    const id = Number(req.params.id);
-
-    const indice = dados.games.findIndex(
-        jogo => jogo.id === id
-    );
-
-    if (indice === -1) {
-        return res.status(404).json({
-            erro: 'Jogo não encontrado'
-        });
-    }
-
-    const jogoAtualizado = {
-        ...dados.games[indice],
-        ...req.body,
-        id
-    };
-
-    dados.games[indice] = jogoAtualizado;
-
-    salvarDados(dados);
-
-    res.status(200).json(jogoAtualizado);
-});
-
-// DELETE /api/jogos/:id
-app.delete('/api/jogos/:id', (req, res) => {
-    const dados = lerDados();
-
-    const id = Number(req.params.id);
-
-    const indice = dados.games.findIndex(
-        jogo => jogo.id === id
-    );
-
-    if (indice === -1) {
-        return res.status(404).json({
-            erro: 'Jogo não encontrado'
-        });
-    }
-
-    const jogoRemovido = dados.games.splice(indice, 1)[0];
-
-    salvarDados(dados);
-
-    res.status(200).json({
-        mensagem: 'Jogo removido com sucesso',
-        jogo: jogoRemovido
-    });
-});
-
-// ==========================================
-// TIMES
-// ==========================================
-
-// GET /api/times
-app.get('/api/times', (req, res) => {
-    const dados = lerDados();
-
-    res.status(200).json(dados.teams);
-});
-
-// GET /api/times/:id
-app.get('/api/times/:id', (req, res) => {
-    const dados = lerDados();
-
-    const time = dados.teams.find(
-        time => time.id === Number(req.params.id)
-    );
-
-    if (!time) {
-        return res.status(404).json({
-            erro: 'Time não encontrado'
-        });
-    }
-
-    res.status(200).json(time);
-});
-
-// POST /api/times
-app.post('/api/times', (req, res) => {
-    const dados = lerDados();
-
-    const { name, color } = req.body;
-
-    if (!name || !color) {
-        return res.status(400).json({
-            erro: 'Nome e cor são obrigatórios'
-        });
-    }
-
-    const novoTime = {
-        id: gerarId(dados.teams),
-        name,
-        color
-    };
-
-    dados.teams.push(novoTime);
-
-    salvarDados(dados);
-
-    res.status(201).json(novoTime);
-});
-
-// PUT /api/times/:id
-app.put('/api/times/:id', (req, res) => {
-    const dados = lerDados();
-
-    const id = Number(req.params.id);
-
-    const indice = dados.teams.findIndex(
-        time => time.id === id
-    );
-
-    if (indice === -1) {
-        return res.status(404).json({
-            erro: 'Time não encontrado'
-        });
-    }
-
-    const timeAtualizado = {
-        ...dados.teams[indice],
-        ...req.body,
-        id
-    };
-
-    dados.teams[indice] = timeAtualizado;
-
-    salvarDados(dados);
-
-    res.status(200).json(timeAtualizado);
-});
-
-// DELETE /api/times/:id
-app.delete('/api/times/:id', (req, res) => {
-    const dados = lerDados();
-
-    const id = Number(req.params.id);
-
-    const indice = dados.teams.findIndex(
-        time => time.id === id
-    );
-
-    if (indice === -1) {
-        return res.status(404).json({
-            erro: 'Time não encontrado'
-        });
-    }
-
-    const timeRemovido = dados.teams.splice(indice, 1)[0];
-
-    salvarDados(dados);
-
-    res.status(200).json({
-        mensagem: 'Time removido com sucesso',
-        time: timeRemovido
-    });
-});
-
-// ==========================================
-// COMPETIDORES
-// ==========================================
-
-// GET /api/competidores
-app.get('/api/competidores', (req, res) => {
-    const dados = lerDados();
-
-    res.status(200).json(dados.competitors);
-});
-
-// GET /api/competidores/:id
-app.get('/api/competidores/:id', (req, res) => {
-    const dados = lerDados();
-
-    const competidor = dados.competitors.find(
-        competidor => competidor.id === Number(req.params.id)
-    );
-
-    if (!competidor) {
-        return res.status(404).json({
-            erro: 'Competidor não encontrado'
-        });
-    }
-
-    res.status(200).json(competidor);
-});
-
-// POST /api/competidores
-app.post('/api/competidores', (req, res) => {
-    const dados = lerDados();
-
-    const { name, nickname, teamId } = req.body;
-
-    if (!name || !nickname || teamId === undefined) {
-        return res.status(400).json({
-            erro: 'Nome, nickname e teamId são obrigatórios'
-        });
-    }
-
-    const timeExiste = dados.teams.some(
-        time => time.id === Number(teamId)
-    );
-
-    if (!timeExiste) {
-        return res.status(400).json({
-            erro: 'O time informado não existe'
-        });
-    }
-
-    const novoCompetidor = {
-        id: gerarId(dados.competitors),
-        name,
-        nickname,
-        teamId: Number(teamId)
-    };
-
-    dados.competitors.push(novoCompetidor);
-
-    salvarDados(dados);
-
-    res.status(201).json(novoCompetidor);
-});
-
-// PUT /api/competidores/:id
-app.put('/api/competidores/:id', (req, res) => {
-    const dados = lerDados();
-
-    const id = Number(req.params.id);
-
-    const indice = dados.competitors.findIndex(
-        competidor => competidor.id === id
-    );
-
-    if (indice === -1) {
-        return res.status(404).json({
-            erro: 'Competidor não encontrado'
-        });
-    }
-
-    const competidorAtualizado = {
-        ...dados.competitors[indice],
-        ...req.body,
-        id
-    };
-
-    if (competidorAtualizado.teamId !== undefined) {
-        const timeExiste = dados.teams.some(
-            time => time.id === Number(competidorAtualizado.teamId)
-        );
-
-        if (!timeExiste) {
-            return res.status(400).json({
-                erro: 'O time informado não existe'
+// =====================================================
+// JOGOS - GET
+// =====================================================
+
+app.get('/api/jogos', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('games')
+            .select('*')
+            .order('id', { ascending: true });
+
+        if (error) {
+            console.error('Erro ao buscar jogos:', error);
+            return res.status(500).json({
+                erro: error.message
             });
         }
 
-        competidorAtualizado.teamId = Number(
-            competidorAtualizado.teamId
-        );
+        res.json(data);
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao buscar jogos.'
+        });
     }
-
-    dados.competitors[indice] = competidorAtualizado;
-
-    salvarDados(dados);
-
-    res.status(200).json(competidorAtualizado);
 });
 
-// DELETE /api/competidores/:id
-app.delete('/api/competidores/:id', (req, res) => {
-    const dados = lerDados();
+// =====================================================
+// JOGOS - GET POR ID
+// =====================================================
 
-    const id = Number(req.params.id);
+app.get('/api/jogos/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
 
-    const indice = dados.competitors.findIndex(
-        competidor => competidor.id === id
-    );
+        const { data, error } = await supabase
+            .from('games')
+            .select('*')
+            .eq('id', id)
+            .single();
 
-    if (indice === -1) {
-        return res.status(404).json({
-            erro: 'Competidor não encontrado'
+        if (error) {
+            return res.status(404).json({
+                erro: 'Jogo não encontrado.'
+            });
+        }
+
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({
+            erro: 'Erro ao buscar jogo.'
         });
     }
-
-    const competidorRemovido =
-        dados.competitors.splice(indice, 1)[0];
-
-    salvarDados(dados);
-
-    res.status(200).json({
-        mensagem: 'Competidor removido com sucesso',
-        competidor: competidorRemovido
-    });
 });
 
-// ==========================================
-// CONFRONTOS
-// ==========================================
+// =====================================================
+// JOGOS - POST
+// =====================================================
 
-// GET /api/confrontos
-app.get('/api/confrontos', (req, res) => {
-    const dados = lerDados();
+app.post('/api/jogos', async (req, res) => {
+    try {
+        const { name, genre } = req.body;
 
-    res.status(200).json(dados.matches);
+        if (!name || !genre) {
+            return res.status(400).json({
+                erro: 'Nome e gênero são obrigatórios.'
+            });
+        }
+
+        const { data, error } = await supabase
+            .from('games')
+            .insert([
+                {
+                    name,
+                    genre
+                }
+            ])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Erro ao criar jogo:', error);
+
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.status(201).json(data);
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao criar jogo.'
+        });
+    }
 });
 
-// GET /api/confrontos/:id
-app.get('/api/confrontos/:id', (req, res) => {
-    const dados = lerDados();
+// =====================================================
+// JOGOS - PUT
+// =====================================================
 
-    const confronto = dados.matches.find(
-        confronto => confronto.id === Number(req.params.id)
-    );
+app.put('/api/jogos/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const { name, genre } = req.body;
 
-    if (!confronto) {
-        return res.status(404).json({
-            erro: 'Confronto não encontrado'
+        if (!name || !genre) {
+            return res.status(400).json({
+                erro: 'Nome e gênero são obrigatórios.'
+            });
+        }
+
+        const { data, error } = await supabase
+            .from('games')
+            .update({
+                name,
+                genre
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Erro ao atualizar jogo:', error);
+
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.json(data);
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao atualizar jogo.'
         });
     }
-
-    res.status(200).json(confronto);
 });
 
-// POST /api/confrontos
-app.post('/api/confrontos', (req, res) => {
-    const dados = lerDados();
+// =====================================================
+// JOGOS - DELETE
+// =====================================================
 
-    const {
-        gameId,
-        team1Id,
-        team2Id,
-        score1,
-        score2,
-        status,
-        date
-    } = req.body;
+app.delete('/api/jogos/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
 
-    if (
-        gameId === undefined ||
-        team1Id === undefined ||
-        team2Id === undefined ||
-        score1 === undefined ||
-        score2 === undefined ||
-        !status ||
-        !date
-    ) {
-        return res.status(400).json({
-            erro: 'Todos os campos do confronto são obrigatórios'
+        const { error } = await supabase
+            .from('games')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Erro ao excluir jogo:', error);
+
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.json({
+            mensagem: 'Jogo excluído com sucesso.'
+        });
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao excluir jogo.'
         });
     }
-
-    const jogoExiste = dados.games.some(
-        jogo => jogo.id === Number(gameId)
-    );
-
-    if (!jogoExiste) {
-        return res.status(400).json({
-            erro: 'O jogo informado não existe'
-        });
-    }
-
-    const time1Existe = dados.teams.some(
-        time => time.id === Number(team1Id)
-    );
-
-    const time2Existe = dados.teams.some(
-        time => time.id === Number(team2Id)
-    );
-
-    if (!time1Existe || !time2Existe) {
-        return res.status(400).json({
-            erro: 'Um ou ambos os times não existem'
-        });
-    }
-
-    const novoConfronto = {
-        id: gerarId(dados.matches),
-        gameId: Number(gameId),
-        team1Id: Number(team1Id),
-        team2Id: Number(team2Id),
-        score1: Number(score1),
-        score2: Number(score2),
-        status,
-        date
-    };
-
-    dados.matches.push(novoConfronto);
-
-    salvarDados(dados);
-
-    res.status(201).json(novoConfronto);
 });
 
-// PUT /api/confrontos/:id
-app.put('/api/confrontos/:id', (req, res) => {
-    const dados = lerDados();
+// =====================================================
+// TIMES - GET
+// =====================================================
 
-    const id = Number(req.params.id);
+app.get('/api/times', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('teams')
+            .select('*')
+            .order('id', { ascending: true });
 
-    const indice = dados.matches.findIndex(
-        confronto => confronto.id === id
-    );
+        if (error) {
+            console.error('Erro ao buscar times:', error);
 
-    if (indice === -1) {
-        return res.status(404).json({
-            erro: 'Confronto não encontrado'
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.json(data);
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao buscar times.'
         });
     }
-
-    const confrontoAtualizado = {
-        ...dados.matches[indice],
-        ...req.body,
-        id
-    };
-
-    // Converte IDs e placares para número
-    if (confrontoAtualizado.gameId !== undefined) {
-        confrontoAtualizado.gameId =
-            Number(confrontoAtualizado.gameId);
-    }
-
-    if (confrontoAtualizado.team1Id !== undefined) {
-        confrontoAtualizado.team1Id =
-            Number(confrontoAtualizado.team1Id);
-    }
-
-    if (confrontoAtualizado.team2Id !== undefined) {
-        confrontoAtualizado.team2Id =
-            Number(confrontoAtualizado.team2Id);
-    }
-
-    if (confrontoAtualizado.score1 !== undefined) {
-        confrontoAtualizado.score1 =
-            Number(confrontoAtualizado.score1);
-    }
-
-    if (confrontoAtualizado.score2 !== undefined) {
-        confrontoAtualizado.score2 =
-            Number(confrontoAtualizado.score2);
-    }
-
-    // Verifica se o jogo existe
-    const jogoExiste = dados.games.some(
-        jogo => jogo.id === confrontoAtualizado.gameId
-    );
-
-    if (!jogoExiste) {
-        return res.status(400).json({
-            erro: 'O jogo informado não existe'
-        });
-    }
-
-    // Verifica se os times existem
-    const time1Existe = dados.teams.some(
-        time => time.id === confrontoAtualizado.team1Id
-    );
-
-    const time2Existe = dados.teams.some(
-        time => time.id === confrontoAtualizado.team2Id
-    );
-
-    if (!time1Existe || !time2Existe) {
-        return res.status(400).json({
-            erro: 'Um ou ambos os times não existem'
-        });
-    }
-
-    dados.matches[indice] = confrontoAtualizado;
-
-    salvarDados(dados);
-
-    res.status(200).json(confrontoAtualizado);
 });
 
-// DELETE /api/confrontos/:id
-app.delete('/api/confrontos/:id', (req, res) => {
-    const dados = lerDados();
+// =====================================================
+// TIMES - GET POR ID
+// =====================================================
 
-    const id = Number(req.params.id);
+app.get('/api/times/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
 
-    const indice = dados.matches.findIndex(
-        confronto => confronto.id === id
-    );
+        const { data, error } = await supabase
+            .from('teams')
+            .select('*')
+            .eq('id', id)
+            .single();
 
-    if (indice === -1) {
-        return res.status(404).json({
-            erro: 'Confronto não encontrado'
+        if (error) {
+            return res.status(404).json({
+                erro: 'Time não encontrado.'
+            });
+        }
+
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({
+            erro: 'Erro ao buscar time.'
         });
     }
-
-    const confrontoRemovido =
-        dados.matches.splice(indice, 1)[0];
-
-    salvarDados(dados);
-
-    res.status(200).json({
-        mensagem: 'Confronto removido com sucesso',
-        confronto: confrontoRemovido
-    });
 });
 
-// ==========================================
+// =====================================================
+// TIMES - POST
+// =====================================================
+
+app.post('/api/times', async (req, res) => {
+    try {
+        const { name, color } = req.body;
+
+        if (!name || !color) {
+            return res.status(400).json({
+                erro: 'Nome e cor são obrigatórios.'
+            });
+        }
+
+        const { data, error } = await supabase
+            .from('teams')
+            .insert([
+                {
+                    name,
+                    color
+                }
+            ])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Erro ao criar time:', error);
+
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.status(201).json(data);
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao criar time.'
+        });
+    }
+});
+
+// =====================================================
+// TIMES - PUT
+// =====================================================
+
+app.put('/api/times/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const { name, color } = req.body;
+
+        if (!name || !color) {
+            return res.status(400).json({
+                erro: 'Nome e cor são obrigatórios.'
+            });
+        }
+
+        const { data, error } = await supabase
+            .from('teams')
+            .update({
+                name,
+                color
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Erro ao atualizar time:', error);
+
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.json(data);
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao atualizar time.'
+        });
+    }
+});
+
+// =====================================================
+// TIMES - DELETE
+// =====================================================
+
+app.delete('/api/times/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+
+        const { error } = await supabase
+            .from('teams')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Erro ao excluir time:', error);
+
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.json({
+            mensagem: 'Time excluído com sucesso.'
+        });
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao excluir time.'
+        });
+    }
+});
+
+// =====================================================
+// COMPETIDORES - GET
+// =====================================================
+
+app.get('/api/competidores', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('competitors')
+            .select('*')
+            .order('id', { ascending: true });
+
+        if (error) {
+            console.error('Erro ao buscar competidores:', error);
+
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.json(data.map(mapCompetidor));
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao buscar competidores.'
+        });
+    }
+});
+
+// =====================================================
+// COMPETIDORES - GET POR ID
+// =====================================================
+
+app.get('/api/competidores/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+
+        const { data, error } = await supabase
+            .from('competitors')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) {
+            return res.status(404).json({
+                erro: 'Competidor não encontrado.'
+            });
+        }
+
+        res.json(mapCompetidor(data));
+    } catch (error) {
+        res.status(500).json({
+            erro: 'Erro ao buscar competidor.'
+        });
+    }
+});
+
+// =====================================================
+// COMPETIDORES - POST
+// =====================================================
+
+app.post('/api/competidores', async (req, res) => {
+    try {
+        const {
+            name,
+            nickname,
+            teamId
+        } = req.body;
+
+        if (!name || !nickname || !teamId) {
+            return res.status(400).json({
+                erro: 'Nome, nickname e time são obrigatórios.'
+            });
+        }
+
+        const { data: team, error: teamError } = await supabase
+            .from('teams')
+            .select('id')
+            .eq('id', Number(teamId))
+            .single();
+
+        if (teamError || !team) {
+            return res.status(400).json({
+                erro: 'O time informado não existe.'
+            });
+        }
+
+        const { data, error } = await supabase
+            .from('competitors')
+            .insert([
+                {
+                    name,
+                    nickname,
+                    team_id: Number(teamId)
+                }
+            ])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Erro ao criar competidor:', error);
+
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.status(201).json(mapCompetidor(data));
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao criar competidor.'
+        });
+    }
+});
+
+// =====================================================
+// COMPETIDORES - PUT
+// =====================================================
+
+app.put('/api/competidores/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+
+        const {
+            name,
+            nickname,
+            teamId
+        } = req.body;
+
+        if (!name || !nickname || !teamId) {
+            return res.status(400).json({
+                erro: 'Nome, nickname e time são obrigatórios.'
+            });
+        }
+
+        const { data: team, error: teamError } = await supabase
+            .from('teams')
+            .select('id')
+            .eq('id', Number(teamId))
+            .single();
+
+        if (teamError || !team) {
+            return res.status(400).json({
+                erro: 'O time informado não existe.'
+            });
+        }
+
+        const { data, error } = await supabase
+            .from('competitors')
+            .update({
+                name,
+                nickname,
+                team_id: Number(teamId)
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Erro ao atualizar competidor:', error);
+
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.json(mapCompetidor(data));
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao atualizar competidor.'
+        });
+    }
+});
+
+// =====================================================
+// COMPETIDORES - DELETE
+// =====================================================
+
+app.delete('/api/competidores/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+
+        const { error } = await supabase
+            .from('competitors')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Erro ao excluir competidor:', error);
+
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.json({
+            mensagem: 'Competidor excluído com sucesso.'
+        });
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao excluir competidor.'
+        });
+    }
+});
+
+// =====================================================
+// CONFRONTOS - GET
+// =====================================================
+
+app.get('/api/confrontos', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('matches')
+            .select('*')
+            .order('id', { ascending: true });
+
+        if (error) {
+            console.error('Erro ao buscar confrontos:', error);
+
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.json(data.map(mapConfronto));
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao buscar confrontos.'
+        });
+    }
+});
+
+// =====================================================
+// CONFRONTOS - GET POR ID
+// =====================================================
+
+app.get('/api/confrontos/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+
+        const { data, error } = await supabase
+            .from('matches')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) {
+            return res.status(404).json({
+                erro: 'Confronto não encontrado.'
+            });
+        }
+
+        res.json(mapConfronto(data));
+    } catch (error) {
+        res.status(500).json({
+            erro: 'Erro ao buscar confronto.'
+        });
+    }
+});
+
+// =====================================================
+// CONFRONTOS - POST
+// =====================================================
+
+app.post('/api/confrontos', async (req, res) => {
+    try {
+        const {
+            gameId,
+            team1Id,
+            team2Id,
+            score1 = 0,
+            score2 = 0,
+            status = 'scheduled',
+            date
+        } = req.body;
+
+        if (!gameId || !team1Id || !team2Id || !date) {
+            return res.status(400).json({
+                erro: 'Jogo, dois times e data são obrigatórios.'
+            });
+        }
+
+        if (Number(team1Id) === Number(team2Id)) {
+            return res.status(400).json({
+                erro: 'Os dois times precisam ser diferentes.'
+            });
+        }
+
+        const { data: game, error: gameError } = await supabase
+            .from('games')
+            .select('id')
+            .eq('id', Number(gameId))
+            .single();
+
+        if (gameError || !game) {
+            return res.status(400).json({
+                erro: 'O jogo informado não existe.'
+            });
+        }
+
+        const { data: teams, error: teamsError } = await supabase
+            .from('teams')
+            .select('id')
+            .in('id', [Number(team1Id), Number(team2Id)]);
+
+        if (
+            teamsError ||
+            !teams ||
+            teams.length !== 2
+        ) {
+            return res.status(400).json({
+                erro: 'Um ou mais times informados não existem.'
+            });
+        }
+
+        const { data, error } = await supabase
+            .from('matches')
+            .insert([
+                {
+                    game_id: Number(gameId),
+                    team1_id: Number(team1Id),
+                    team2_id: Number(team2Id),
+                    score1: Number(score1),
+                    score2: Number(score2),
+                    status,
+                    date
+                }
+            ])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Erro ao criar confronto:', error);
+
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.status(201).json(mapConfronto(data));
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao criar confronto.'
+        });
+    }
+});
+
+// =====================================================
+// CONFRONTOS - PUT
+// =====================================================
+
+app.put('/api/confrontos/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+
+        const {
+            gameId,
+            team1Id,
+            team2Id,
+            score1 = 0,
+            score2 = 0,
+            status = 'scheduled',
+            date
+        } = req.body;
+
+        if (!gameId || !team1Id || !team2Id || !date) {
+            return res.status(400).json({
+                erro: 'Jogo, dois times e data são obrigatórios.'
+            });
+        }
+
+        if (Number(team1Id) === Number(team2Id)) {
+            return res.status(400).json({
+                erro: 'Os dois times precisam ser diferentes.'
+            });
+        }
+
+        const { data, error } = await supabase
+            .from('matches')
+            .update({
+                game_id: Number(gameId),
+                team1_id: Number(team1Id),
+                team2_id: Number(team2Id),
+                score1: Number(score1),
+                score2: Number(score2),
+                status,
+                date
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Erro ao atualizar confronto:', error);
+
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.json(mapConfronto(data));
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao atualizar confronto.'
+        });
+    }
+});
+
+// =====================================================
+// CONFRONTOS - DELETE
+// =====================================================
+
+app.delete('/api/confrontos/:id', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+
+        const { error } = await supabase
+            .from('matches')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Erro ao excluir confronto:', error);
+
+            return res.status(500).json({
+                erro: error.message
+            });
+        }
+
+        res.json({
+            mensagem: 'Confronto excluído com sucesso.'
+        });
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            erro: 'Erro ao excluir confronto.'
+        });
+    }
+});
+
+// =====================================================
 // ROTA NÃO ENCONTRADA
-// ==========================================
+// =====================================================
 
 app.use((req, res) => {
     res.status(404).json({
-        erro: 'Rota não encontrada',
-        mensagem: 'Verifique a URL e o método da requisição'
+        erro: 'Rota não encontrada.'
     });
 });
 
-// ==========================================
+// =====================================================
 // INICIAR SERVIDOR
-// ==========================================
+// =====================================================
 
 app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
-    console.log(`Acesse: http://localhost:${PORT}`);
+    console.log(`API GamerClass rodando em http://localhost:${PORT}`);
+    console.log('Banco de dados: Supabase');
 });
-
